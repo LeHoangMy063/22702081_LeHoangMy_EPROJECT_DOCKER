@@ -25,43 +25,43 @@ jobs:
       - name: Check Docker version
         run: docker --version
 
-      # 4️⃣ Build tất cả Docker image theo docker-compose.yml
+      # 4️⃣ Build Docker images
       - name: Build Docker images
         run: docker compose -f docker-compose.yml build
 
-      # 5️⃣ Tạo file .env.ci cho CI
+      # 5️⃣ Sinh file .env.ci cho CI
       - name: Generate .env file for CI
         run: |
           echo "JWT_SECRET=${{ vars.JWT_SECRET }}" >> .env.ci
+          echo "MONGODB_AUTH_URI=${{ vars.MONGODB_AUTH_URI }}" >> .env.ci
           echo "MONGODB_PRODUCT_URI=${{ vars.MONGODB_PRODUCT_URI }}" >> .env.ci
           echo "MONGODB_ORDER_URI=${{ vars.MONGODB_ORDER_URI }}" >> .env.ci
-          echo "MONGODB_AUTH_URI=${{ vars.MONGODB_AUTH_URI }}" >> .env.ci
           echo "RABBITMQ_URL=${{ vars.RABBITMQ_URL }}" >> .env.ci
 
-      # 6️⃣ Khởi động container
+      # 6️⃣ Start containers
       - name: Start containers
         run: docker compose --env-file .env.ci -f docker-compose.yml up -d
 
-      # 7️⃣ Đợi service chạy ổn định (tăng thời gian lên để Gateway + Auth khởi động xong)
-      - name: Wait for containers to be ready
+      # 7️⃣ Chờ các service khởi động (API Gateway, Auth, MongoDB)
+      - name: Wait for services to be ready
         run: |
-          echo "⏳ Đợi các service khởi động (30s)..."
+          echo "⏳ Đợi container khởi động..."
           sleep 30
-          echo "✅ Tiếp tục test"
+          echo "✅ Containers đã sẵn sàng."
 
-      # 8️⃣ Kiểm tra xem container nào đang chạy
+      # 8️⃣ Kiểm tra container đang chạy
       - name: List running containers
-        run: docker ps
+        run: docker ps -a
 
-      # 9️⃣ Kiểm tra API Gateway sẵn sàng chưa
-      - name: Wait for API Gateway to be ready
+      # 9️⃣ Kiểm tra API Gateway sẵn sàng
+      - name: Wait for API Gateway to respond
         run: |
           for i in {1..15}; do
             if curl -s http://localhost:3003/ > /dev/null; then
               echo "✅ API Gateway is ready!"
               break
             fi
-            echo "⏳ Waiting for API Gateway..."
+            echo "⏳ Waiting for API Gateway ($i/15)..."
             sleep 2
           done
 
@@ -73,6 +73,7 @@ jobs:
 
       # 1️⃣1️⃣ Dừng container sau khi test xong
       - name: Stop containers
+        if: always()
         run: docker compose -f docker-compose.yml down
 
 
@@ -85,47 +86,57 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Rebuild Docker images
+      # 2️⃣ Rebuild để đảm bảo images sạch
       - name: Rebuild Docker Images for Deployment
         run: docker compose -f docker-compose.yml build --no-cache
 
-      # 3️⃣ Tag Image để đẩy lên Docker Hub
+      # 3️⃣ Tag lại image để đẩy lên Docker Hub
       - name: Tag Built Images to Simple Names
         run: |
           SERVICES=("hoangmy_api_gateway" "hoangmy_auth_service" "hoangmy_order_service" "hoangmy_product_service")
           for SERVICE in ${SERVICES[@]}; do
-            COMPOSE_FULL_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${SERVICE}:latest" | head -n 1)
-            if [ -n "$COMPOSE_FULL_NAME" ]; then
-              echo "🔖 Tagging image: $COMPOSE_FULL_NAME -> ${SERVICE}:latest"
-              docker tag "$COMPOSE_FULL_NAME" "${SERVICE}:latest"
+            IMAGE_ID=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${SERVICE}:latest" | head -n 1)
+            if [ -n "$IMAGE_ID" ]; then
+              echo "🔖 Tagging $SERVICE ..."
+              docker tag "$IMAGE_ID" "${SERVICE}:latest"
             else
-              echo "❌ Không tìm thấy image $SERVICE sau khi build!"
+              echo "❌ Không tìm thấy image $SERVICE!"
               docker images
               exit 1
             fi
           done
 
-      # 4️⃣ Đăng nhập Docker Hub
+      # 4️⃣ Kiểm tra secrets có tồn tại không (debug)
+      - name: Debug DockerHub Secrets
+        run: |
+          echo "👤 Username length: $(echo '${{ secrets.DOCKERHUB_USERNAME }}' | wc -c)"
+          echo "🔑 Password length: $(echo '${{ secrets.DOCKERHUB_PASSWORD }}' | wc -c)"
+
+      # 5️⃣ Đăng nhập Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      # 5️⃣ Push image lên Docker Hub
-      - name: Tag and Push Images
+      # 6️⃣ Đẩy images lên Docker Hub
+      - name: Push Images to Docker Hub
         env:
           DOCKER_REPO: ${{ secrets.DOCKERHUB_USERNAME }}
           TAG: ${{ github.sha }}
         run: |
           SERVICES=("hoangmy_api_gateway" "hoangmy_auth_service" "hoangmy_order_service" "hoangmy_product_service")
+
           for SERVICE in ${SERVICES[@]}; do
             REPO_NAME=$(echo $SERVICE | cut -d'_' -f2-)
             echo "⬆️ Đang đẩy image $SERVICE..."
             docker tag $SERVICE:latest $DOCKER_REPO/$REPO_NAME:$TAG
             docker push $DOCKER_REPO/$REPO_NAME:$TAG
+
             docker tag $SERVICE:latest $DOCKER_REPO/$REPO_NAME:latest
             docker push $DOCKER_REPO/$REPO_NAME:latest
+
             echo "✅ Hoàn tất: $DOCKER_REPO/$REPO_NAME"
           done
-          echo "🎉 Đã đẩy tất cả image thành công!"
+
+          echo "🎉 Đã đẩy tất cả images thành công!"
