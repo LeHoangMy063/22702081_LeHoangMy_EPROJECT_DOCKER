@@ -285,10 +285,10 @@ npm run dev
 
 ## Mongodb
 
-![user](./public/result/mongo_user.png)
+![mongo_user](./public/result/mongo_user.png)
 
-![user](./public/result/mongo_product.png)
+![mongo_product](./public/result/mongo_product.png)
 
-![user](./public/result/mongo_order.png)
+![mongo_order](./public/result/mongo_order.png)
 
 
