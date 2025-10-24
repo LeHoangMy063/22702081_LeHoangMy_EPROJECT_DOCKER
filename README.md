@@ -281,7 +281,7 @@ npm run dev
 
 5. Mua sản phẩm: POST http://localhost:3001/products/api/v1/buy
 
-![login](./public/result/product.png.png)
+![buy](./public/result/buy.png)
 
 ## Mongodb
 
