@@ -53,7 +53,7 @@ jobs:
 
       # 7 Chạy file test trên product service 
       - name: Run File Test In Product Service
-        run: docker exec --env-file .env.ci tiuquoai_product_service npm test
+        run: docker exec --env-file .env.ci hoangmy_product_service npm test
 
       # 6️⃣ Dừng container sau khi test
       - name: Stop containers
@@ -77,7 +77,7 @@ jobs:
       # 3️⃣ Tag Image: Vì rebuild nên nó lại có tên dài
       - name: Tag Built Images to Simple Names
         run: |
-          SERVICES=("tiuquoai_api_gateway" "tiuquoai_auth_service" "tiuquoai_order_service" "tiuquoai_product_service")
+          SERVICES=("hoangmy_api_gateway" "hoangmy_auth_service" "hoangmy_order_service" "hoangmy_product_service")
           
           for SERVICE in ${SERVICES[@]}; do
             # Tìm tên image đầy đủ (Repository) có chứa tên SERVICE của bạn
@@ -106,7 +106,7 @@ jobs:
           DOCKER_REPO: ${{ secrets.DOCKERHUB_USERNAME }}
           TAG: ${{ github.sha }}
         run: |
-          SERVICES=("tiuquoai_api_gateway" "tiuquoai_auth_service" "tiuquoai_order_service" "tiuquoai_product_service")
+          SERVICES=("hoangmy_api_gateway" "hoangmy_auth_service" "hoangmy_order_service" "hoangmy_product_service")
           for SERVICE in ${SERVICES[@]}; do
             REPO_NAME=$(echo $SERVICE | cut -d'_' -f2-)
             echo "Bắt đầu đẩy image $SERVICE..."
